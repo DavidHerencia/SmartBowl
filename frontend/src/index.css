@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color: #0f172a;
+  background-color: #f8fafc;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.card-glow {
+  box-shadow: 0 25px 50px -12px rgba(37, 99, 235, 0.15);
+}
+
+.shadow-glow {
+  box-shadow: 0 20px 45px -20px rgba(37, 99, 235, 0.6);
+}
+
+.wave {
+  background: linear-gradient(180deg, #2563eb 0%, #0ea5e9 100%);
+}

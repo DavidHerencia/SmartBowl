@@ -1,0 +1,258 @@
+import React, { useState, useEffect } from 'react';
+import { Droplets, Power, Clock, Activity, Calendar, AlertCircle, RefreshCw, Smartphone, CheckCircle2 } from 'lucide-react';
+
+const App = () => {
+  // --- Estados del Sistema ---
+  const [waterLevel, setWaterLevel] = useState(45); // Nivel en %
+  const [isSystemOn, setIsSystemOn] = useState(true);
+  const [isFilling, setIsFilling] = useState(false);
+  const [isDrinking, setIsDrinking] = useState(false); // Nuevo estado: Mascota bebiendo
+  const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Datos simulados
+  const lastDetection = "10:42 AM";
+  
+  // --- Historial de Consumo (Simulación de Backend) ---
+  const consumptionHistory = [
+    { day: 'Lun', level: 'high', value: 850, date: '2023-11-20' },
+    { day: 'Mar', level: 'medium', value: 500, date: '2023-11-21' },
+    { day: 'Mié', level: 'high', value: 900, date: '2023-11-22' },
+    { day: 'Jue', level: 'low', value: 200, date: '2023-11-23' },
+    { day: 'Vie', level: 'high', value: 800, date: '2023-11-24' },
+    { day: 'Sáb', level: 'medium', value: 450, date: '2023-11-25' },
+    { day: 'Dom', level: 'high', value: 780, date: '2023-11-26' },
+  ];
+
+  // Actualizar reloj cada segundo
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Simulación: Alternar estado de "Bebiendo" aleatoriamente para demostración
+  useEffect(() => {
+    if (!isSystemOn) return;
+    const drinkTimer = setInterval(() => {
+      setIsDrinking(prev => !prev);
+    }, 5000); // Cambia cada 5 segundos para demo
+    return () => clearInterval(drinkTimer);
+  }, [isSystemOn]);
+
+  // Simulación de llenado de agua
+  const handleFill = () => {
+    if (!isSystemOn) return;
+    setIsFilling(true);
+    const interval = setInterval(() => {
+      setWaterLevel((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setIsFilling(false);
+          return 100;
+        }
+        return prev + 5;
+      });
+    }, 200);
+  };
+
+  // Toggle Apagar/Encender
+  const togglePower = () => {
+    setIsSystemOn(!isSystemOn);
+    if (isFilling) setIsFilling(false);
+    setIsDrinking(false); // Resetear al apagar
+  };
+
+  // Funciones auxiliares de estilo
+  const getStatusColor = (level) => {
+    switch (level) {
+      case 'high': return 'bg-emerald-500';
+      case 'medium': return 'bg-amber-400';
+      case 'low': return 'bg-rose-500';
+      default: return 'bg-gray-300';
+    }
+  };
+
+  return (
+    <div className={`min-h-screen transition-colors duration-500 ${isSystemOn ? 'bg-slate-50' : 'bg-gray-900'}`}>
+      
+      {/* --- HEADER --- */}
+      <header className="bg-white shadow-sm sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <div className="bg-blue-600 p-2 rounded-lg">
+              <Droplets className="text-white w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="font-bold text-gray-800 text-lg leading-tight">SmartBowl</h1>
+              <p className="text-xs text-gray-500">IoT Pet Hydration</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-2 ${isSystemOn ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+              <span className={`w-2 h-2 rounded-full ${isSystemOn ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
+              {isSystemOn ? 'ONLINE' : 'OFFLINE'}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        
+        {/* --- GRID PRINCIPAL --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          {/* TARJETA 1: VISUALIZACIÓN DEL AGUA */}
+          <div className={`relative overflow-hidden rounded-2xl shadow-lg transition-all ${isSystemOn ? 'bg-white' : 'bg-gray-800 border border-gray-700'}`}>
+            <div className="absolute top-4 right-4 z-10">
+              <span className="text-4xl font-bold text-blue-600">{isSystemOn ? `${waterLevel}%` : '--'}</span>
+            </div>
+            
+            <div className="p-6 h-64 flex flex-col justify-between relative z-10">
+              <h2 className={`font-semibold text-lg ${isSystemOn ? 'text-gray-700' : 'text-gray-400'}`}>Nivel del Tanque</h2>
+              
+              {/* Información rápida */}
+              <div className="space-y-2 mt-4">
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Clock className="w-4 h-4" />
+                  <span>Hora: {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-blue-600 font-medium bg-blue-50 w-fit px-2 py-1 rounded-md">
+                  <Activity className="w-4 h-4" />
+                  <span>Último sorbo: {isSystemOn ? lastDetection : '--:--'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Visualización Gráfica del Agua (Ola CSS) */}
+            <div 
+              className={`absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out ${isSystemOn ? 'opacity-100' : 'opacity-20 grayscale'}`}
+              style={{ height: `${waterLevel}%` }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-t from-blue-600 to-cyan-400 opacity-90"></div>
+              <div className="w-full h-4 bg-cyan-400 opacity-50 absolute -top-2 blur-sm"></div>
+            </div>
+          </div>
+
+          {/* TARJETA 2: CONTROLES Y ESTADO */}
+          <div className={`rounded-2xl shadow-lg p-6 flex flex-col gap-4 ${isSystemOn ? 'bg-white' : 'bg-gray-800 border border-gray-700'}`}>
+            
+            {/* NUEVA SECCIÓN: ESTADO DE CONSUMO ACTUAL */}
+            <div className={`p-4 rounded-xl border flex items-center justify-between transition-all duration-500 
+              ${!isSystemOn ? 'bg-gray-700 border-gray-600 opacity-50' : 
+                isDrinking 
+                  ? 'bg-blue-600 border-blue-500 shadow-md shadow-blue-200' 
+                  : 'bg-slate-50 border-slate-200'
+              }`}>
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-full ${isDrinking ? 'bg-white/20' : 'bg-gray-200'}`}>
+                  {isDrinking ? (
+                    <Activity className="w-6 h-6 text-white animate-pulse" />
+                  ) : (
+                    <CheckCircle2 className="w-6 h-6 text-gray-400" />
+                  )}
+                </div>
+                <div>
+                  <h3 className={`font-bold text-sm ${isDrinking ? 'text-white' : 'text-gray-700'}`}>
+                    {isDrinking ? 'Detectando Consumo' : 'En Reposo'}
+                  </h3>
+                  <p className={`text-xs ${isDrinking ? 'text-blue-100' : 'text-gray-500'}`}>
+                    {isDrinking ? 'Tu mascota está bebiendo agua' : 'Sin actividad reciente'}
+                  </p>
+                </div>
+              </div>
+              
+              {isDrinking && (
+                <span className="flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-white opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                </span>
+              )}
+            </div>
+
+            <h2 className={`font-semibold text-lg mt-2 ${isSystemOn ? 'text-gray-700' : 'text-gray-400'}`}>Acciones Rápidas</h2>
+            
+            <button 
+              onClick={handleFill}
+              disabled={!isSystemOn || isFilling || waterLevel >= 100}
+              className={`w-full py-4 rounded-xl flex items-center justify-center gap-3 font-semibold transition-all
+                ${isFilling 
+                  ? 'bg-blue-100 text-blue-800 cursor-wait' 
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none'
+                }`}
+            >
+              <RefreshCw className={`w-5 h-5 ${isFilling ? 'animate-spin' : ''}`} />
+              {isFilling ? 'Llenando...' : waterLevel >= 100 ? 'Tanque Lleno' : 'Llenar Tanque'}
+            </button>
+
+            <button 
+              onClick={togglePower}
+              className={`w-full py-4 rounded-xl flex items-center justify-center gap-3 font-semibold transition-all border-2
+                ${isSystemOn 
+                  ? 'border-gray-200 text-gray-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200' 
+                  : 'bg-emerald-500 border-transparent text-white shadow-lg hover:bg-emerald-600'
+                }`}
+            >
+              <Power className="w-5 h-5" />
+              {isSystemOn ? 'Apagar Sistema' : 'Encender Sistema'}
+            </button>
+
+             {!isSystemOn && (
+              <div className="flex items-center gap-2 text-yellow-500 text-sm bg-yellow-500/10 p-3 rounded-lg mt-2">
+                <AlertCircle className="w-4 h-4" />
+                <span>Sistema desconectado.</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* --- SECCIÓN DE ANALÍTICA (MAPA DE CALOR) --- */}
+        <div className={`rounded-2xl shadow-lg p-6 transition-colors ${isSystemOn ? 'bg-white' : 'bg-gray-800 border border-gray-700'}`}>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className={`font-semibold text-lg flex items-center gap-2 ${isSystemOn ? 'text-gray-700' : 'text-gray-400'}`}>
+              <Calendar className="w-5 h-5 text-purple-500" />
+              Historial de Hidratación
+            </h2>
+            <div className="flex gap-4 text-xs">
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-emerald-500"></div><span className="text-gray-500">Adecuado</span></div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-amber-400"></div><span className="text-gray-500">Medio</span></div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-rose-500"></div><span className="text-gray-500">Mínimo</span></div>
+            </div>
+          </div>
+
+          {/* Heatmap Grid */}
+          <div className="grid grid-cols-7 gap-2 sm:gap-4">
+            {consumptionHistory.map((item, index) => (
+              <div key={index} className="flex flex-col items-center gap-2 group cursor-pointer">
+                {/* Tooltip simulado (hover) */}
+                <div className="relative w-full aspect-[3/4] rounded-xl overflow-hidden bg-gray-100">
+                  <div 
+                    className={`absolute inset-0 opacity-80 transition-all group-hover:opacity-100 ${getStatusColor(item.level)}`}
+                  ></div>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-white/90">
+                     <span className="text-xs font-bold capitalize">{item.level === 'high' ? 'OK' : item.level === 'low' ? 'Low' : 'Med'}</span>
+                  </div>
+                </div>
+                
+                <div className="text-center">
+                  <span className={`text-sm font-medium block ${isSystemOn ? 'text-gray-600' : 'text-gray-400'}`}>{item.day}</span>
+                  <span className="text-[10px] text-gray-400 hidden sm:block">{item.value}ml</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
+            <h3 className="text-blue-800 font-semibold text-sm mb-1">Resumen Semanal</h3>
+            <p className="text-blue-600 text-xs leading-relaxed">
+              Tu mascota ha mantenido una hidratación <strong>Adecuada</strong> la mayor parte de la semana. 
+              Se detectó un descenso el día <strong>Jueves</strong>. Se recomienda revisar si el bebedero estuvo accesible.
+            </p>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  );
+};
+
+export default App;
