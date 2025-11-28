@@ -1,0 +1,16 @@
+[project]
+name = "smartbowl-backend"
+version = "0.1.0"
+requires-python = "==3.11.9"
+
+dependencies = [
+    "fastapi",
+    "hypercorn",
+    "paho-mqtt",
+    "python-dotenv",
+    "scikit-learn",
+    "pydantic",
+    "uvicorn[standard]>=0.22.0"
+]
+
+[tool.uv]
