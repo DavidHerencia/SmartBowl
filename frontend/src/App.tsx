@@ -16,7 +16,7 @@ import { useDashboardSummary } from "./hooks/useDashboardSummary";
 import { HydrationHeatmap } from "./components/HydrationHeatmap";
 import { ClusterInsights } from "./components/ClusterInsights";
 import { getLatestSensors, sendActuatorCommand } from "./lib/api";
-import type { SensorsLatestResponse } from "./types/dashboard";
+import type { HydrationDayItem, SensorsLatestResponse } from "./types/dashboard";
 
 const formatIso = (iso?: string | null, fallback = "--:--") => {
   if (!iso) return fallback;
@@ -58,8 +58,6 @@ const formatMl = (ml?: number | null) => `${ml ? Math.round(ml) : 0} ml`;
 
 const sanitizePercent = (value: number) => Math.min(100, Math.max(0, value));
 
-const tankWaveStyle = (value: number) => ({ height: `${sanitizePercent(value)}%` });
-
 const safeNumber = (value: unknown): number | null => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
@@ -81,6 +79,58 @@ const summarizeJson = (payload?: Record<string, unknown> | null) => {
 const readField = (obj: Record<string, unknown> | null | undefined, field: string) => {
   if (!obj || typeof obj !== "object") return undefined;
   return (obj as Record<string, unknown>)[field];
+};
+
+const buildHydrationAdvice = (items: HydrationDayItem[], today?: HydrationDayItem | null) => {
+  if (!items.length) {
+    return "Aún no hay historial suficiente para generar una recomendación semanal. Mantén el tazón lleno y vuelve a revisar mañana.";
+  }
+
+  const counts = items.reduce(
+    (acc, item) => {
+      if (item?.level && acc[item.level as keyof typeof acc] !== undefined) {
+        acc[item.level as keyof typeof acc] += 1;
+      }
+      return acc;
+    },
+    { high: 0, medium: 0, low: 0 }
+  );
+
+  const total = items.length;
+  let lowStreak = 0;
+  let longestLowStreak = 0;
+  for (const item of items) {
+    if (item?.level === "low") {
+      lowStreak += 1;
+      longestLowStreak = Math.max(longestLowStreak, lowStreak);
+    } else {
+      lowStreak = 0;
+    }
+  }
+
+  const { high, medium, low } = counts;
+  let base: string;
+
+  if (low >= 3 || longestLowStreak >= 2) {
+    base = `Consumo bajo en ${low} de los últimos ${total} días. Revisa el llenado del tanque y ofrece agua fresca con mayor frecuencia.`;
+  } else if (medium >= 4) {
+    base = `Hidratación intermitente: ${medium}/${total} días con consumo medio. Programa chequeos extra del bowl y confirma que no quede vacío.`;
+  } else if (high >= 4) {
+    base = `Ritmo estable: ${high}/${total} días en rango adecuado. Mantén la rutina de recarga y limpieza para sostener la tendencia.`;
+  } else {
+    base = `Semana con patrones mixtos · Adecuado ${high}, Medio ${medium}, Mínimo ${low}. Observa si hay cambios en el ambiente o en el apetito.`;
+  }
+
+  let todayAdvice = "";
+  if (today?.level === "low") {
+    todayAdvice = " Hoy el consumo va por debajo de lo esperado; ofrece agua fresca y monitorea las próximas horas.";
+  } else if (today?.level === "medium") {
+    todayAdvice = " Hoy se mantiene en un rango medio; vuelve a medir al final del día para confirmar la tendencia.";
+  } else if (today?.level === "high") {
+    todayAdvice = " Hoy la hidratación luce adecuada; solo verifica que quede suficiente agua disponible.";
+  }
+
+  return todayAdvice ? `${base}${todayAdvice}` : base;
 };
 
 const App = () => {
@@ -132,6 +182,8 @@ const App = () => {
   const hydration = data?.hydration;
   const todayEntry = hydration?.today?.entry ?? null;
   const tankPercent = status?.tank_level_percent ?? 0;
+  const tankFillPercent = sanitizePercent(tankPercent);
+  const tankWaveHeight = `${tankFillPercent}%`;
   const backendSystemOn = status?.is_system_on ?? false;
   const isSystemOn = localSystemOn ?? backendSystemOn;
   const isOnline = status?.is_online ?? false;
@@ -196,6 +248,7 @@ const App = () => {
   );
   const currentVolumeMl =
     statusVolume ?? levelVolume ?? hydrationVolumeFromEvent ?? hydrationVolumeFromSensors ?? null;
+  const heatmapSummary = buildHydrationAdvice(hydration?.week?.items ?? [], todayEntry);
 
   const topic = data?.device?.topic ?? sensors?.subscribed_topic ?? "home/water/consumption";
 
@@ -269,17 +322,17 @@ const App = () => {
               isSystemOn ? "bg-white border-slate-100" : "bg-slate-900 text-white border-slate-800"
             )}
           >
-            <div className="absolute top-5 right-6 text-4xl sm:text-5xl font-extrabold text-blue-500">
-              {loadingState ? "--" : `${sanitizePercent(tankPercent).toFixed(0)}%`}
+            <div className="absolute top-5 right-6 text-4xl sm:text-5xl font-extrabold text-blue-600 drop-shadow-[0_2px_6px_rgba(15,23,42,0.25)] z-20">
+              {loadingState ? "--" : `${tankFillPercent.toFixed(0)}%`}
             </div>
-            <div className="absolute top-16 right-6 text-sm font-semibold text-slate-500">
+            <div className="absolute top-16 right-6 text-xl sm:text-2xl font-black text-slate-800 drop-shadow-[0_2px_4px_rgba(15,23,42,0.35)] z-20">
               {currentVolumeMl != null ? formatMl(currentVolumeMl) : "Sin volumen"}
             </div>
             <div className="p-6 h-72 flex flex-col justify-between relative z-10">
               <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Nivel del tanque</p>
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Nivel del tanque</p>
                 <h2 className="text-2xl font-bold">Capacidad estimada</h2>
-                <p className="text-sm text-slate-500 mt-1">
+                <p className="text-sm text-slate-600 mt-1">
                   Última lectura: {formatIso(status?.last_seen_iso, "Sin registro")}
                 </p>
               </div>
@@ -302,9 +355,12 @@ const App = () => {
                 </div>
               </div>
             </div>
-            <div className="absolute bottom-0 left-0 right-0 transition-all duration-1000" style={tankWaveStyle(tankPercent)}>
-              <div className="wave rounded-t-[60%] opacity-90 w-full h-full" />
-              <div className="h-6 bg-cyan-200 opacity-50 -mt-2 blur-xl" />
+            <div
+              className="absolute bottom-0 left-0 right-0 transition-all duration-1000"
+              style={{ height: tankWaveHeight }}
+            >
+              <div className="wave rounded-t-[28px] overflow-hidden opacity-95 w-full h-full shadow-inner" />
+              <div className="h-6 bg-cyan-100 opacity-60 -mt-2 blur-xl" />
             </div>
           </section>
 
@@ -422,7 +478,7 @@ const App = () => {
 
         <HydrationHeatmap
           items={hydration?.week?.items ?? []}
-          summary={hydration?.summary ?? "Sin    de hidratación."}
+          summary={heatmapSummary}
           loading={loadingState}
         />
 

@@ -10,6 +10,20 @@ La lógica de detección de presencia y cálculo de volumen en el bowl vive en e
 
 ---
 
+## Tabla de contenidos
+
+- [1. Flujo de datos de extremo a extremo](#1-flujo-de-datos-de-extremo-a-extremo)
+	- [1.1. Publicación desde el ESP32 (MQTT)](#11-publicación-desde-el-esp32-mqtt)
+	- [1.2. Recepción en el backend (MQTT → callbacks)](#12-recepción-en-el-backend-mqtt--callbacks)
+	- [1.3. Procesamiento de un evento de hidratación](#13-procesamiento-de-un-evento-de-hidratación)
+	- [1.4. Lecturas de nivel del tanque](#14-lecturas-de-nivel-del-tanque-tópico-homewaterlevel)
+	- [1.5. Agregación diaria y semanal](#15-agregación-diaria-y-semanal)
+- [2. K-Means: cómo se usa y qué aporta](#2-k-means-cómo-se-usa-y-qué-aporta)
+- [3. Endpoints principales del backend](#3-endpoints-principales-del-backend)
+- [4. Resumen](#4-resumen)
+
+---
+
 ## 1. Flujo de datos de extremo a extremo
 
 ### 1.1. Publicación desde el ESP32 (MQTT)
@@ -77,7 +91,23 @@ En `_handle_hydration_event` ocurre la lógica interesante:
 	 - Calcula el día UTC y actualiza `hydration_log` vía `db.upsert_daily_ml(day, ml_consumed)` sumando lo bebido en ese día.
 	 - Guarda también el mensaje crudo en la tabla `readings` para trazabilidad.
 
-### 1.4. Agregación diaria y semanal
+### 1.4. Lecturas de nivel del tanque (tópico `home/water/level`)
+
+Además del tópico principal de consumo, el ESP32 puede publicar mediciones puntuales del volumen actual del bowl en `home/water/level` (configurable vía `LEVEL_TOPIC`). El payload mínimo es:
+
+```json
+{ "volumen": 720.0 }
+```
+
+Cuando el backend recibe este mensaje:
+
+1. Actualiza `latest_readings["level_last"]` con la lectura cruda más un sello de tiempo.
+2. Refresca `status["current_volume_ml"]` y recalcula `status["tank_level_percent"]` si conoce la capacidad estimada.
+3. Expone inmediatamente los nuevos valores vía `/analytics/dashboard/summary` y `/sensors/latest`, permitiendo que el frontend muestre el nivel aun cuando no hubo un evento de consumo reciente.
+
+En el dashboard, la tarjeta "Capacidad estimada" toma el volumen más confiable disponible en este orden: lectura de nivel, último evento de hidratación o estado calculado. Así el usuario siempre ve datos actualizados aunque solo se haya rellenado el tanque.
+
+### 1.5. Agregación diaria y semanal
 
 El módulo `backend/app/core/db.py` define:
 
@@ -310,9 +340,9 @@ Beneficio para el usuario final:
 
 ---
 
-## 4. Cómo explicarlo al profesor y venderlo al usuario final
+## 4. Resumen
 
-### 4.1. Explicación técnica (para el profesor)
+### 4.1. Explicación técnica
 
 1. **Arquitectura desacoplada**: el ESP32 solo se preocupa de sensar y publicar tres números. El backend se encarga de persistencia, agregación y ML. El frontend consume una sola API (`/analytics/dashboard/summary`) pensada para UI.
 2. **Procesamiento por eventos**: cada mensaje MQTT se traduce en:
@@ -323,7 +353,7 @@ Beneficio para el usuario final:
 4. **Clasificación y scoring**: para cada día, y en particular hoy, se calcula a qué cluster pertenece y qué tan lejos está del centro, lo que permite interpretar el resultado como "día típico", "ligeramente atípico" o "muy raro".
 5. **Todo en SQLite + FastAPI**: fácil de depurar y portable, pero con conceptos que se pueden escalar a otras bases y brokers.
 
-### 4.2. Mensaje para el usuario final (vender el producto)
+### 4.2. Mensaje final
 
 - **Más que un dispensador automático**: SmartBowl no solo llena el bebedero; aprende el patrón de hidratación de tu mascota.
 - **Alertas tempranas**: cuando un día se parece al cluster "Mínimo" (muy poco consumo), el sistema puede advertirte para revisar si falta agua o si tu mascota podría estar enferma.

@@ -14,20 +14,20 @@ Structure (key files):
 
 Run locally:
 
-1. Install deps: `pip install -r requirements.txt`
+1. Install deps: `uv sync`
 2. Seed DB con datos de ejemplo (recomendado para dashboards):
 
 	```bash
-	python scripts/seed_db.py --days 120 --min-events 2 --max-events 4
+	python scripts/seed_db.py
 	```
 
-	Genera ~300 mediciones históricas para alimentar el clustering K-Means.
+	Genera mediciones históricas para alimentar el clustering K-Means.
 3. Start server locally (using Uvicorn):
 
 Permite el acceso CORS desde el frontend configurando `API_ALLOWED_ORIGINS`, por ejemplo:
 
 ```bash
-uv run python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 
+uv run python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000   
 ```
 
 MQTT topics (defaults are configurable via env vars):
@@ -38,6 +38,12 @@ MQTT topics (defaults are configurable via env vars):
 		"volumen_inicio": 950.0,
 		"volumen_fin": 920.5,
 		"duracion": 12.5
+	}
+
+- `home/water/level` — tópico adicional para reportar el volumen actual del tanque cuando se rellena o se mide manualmente. Payload típico:
+
+	{
+		"volumen": 720.0
 	}
 
 - `home/actions` — single outbound topic where the backend publishes actuator commands as JSON, e.g. `{ "command": "llenar", "actuator": "bomba" }`.
