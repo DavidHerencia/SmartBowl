@@ -55,6 +55,7 @@ export interface DeviceStatus {
   last_drink_ts?: number | null;
   last_drink_ml?: number | null;
   estimated_capacity_ml?: number | null;
+  current_volume_ml?: number | null;
 }
 
 export interface LastCommand {
@@ -97,6 +98,7 @@ export interface SensorsLatestResponse {
   subscribed_topic?: string;
   raw_last?: SensorTopicEntry | null;
   hydration_last?: Record<string, unknown> | null;
+  level_last?: Record<string, unknown> | null;
   topics?: SensorTopicEntry[];
   last_event?: Record<string, unknown> | null;
   status?: Record<string, unknown> | null;

@@ -28,7 +28,7 @@ export const HydrationHeatmap = ({ items, summary, loading }: Props) => {
           </span>
           <div>
             <h2 className="font-semibold text-lg">Historial de Hidratación</h2>
-            <p className="text-sm text-slate-500">Últimos días agrupados por K-Means</p>
+            <p className="text-sm text-slate-500">Días clasificados por K-Means</p>
           </div>
         </div>
         <div className="flex gap-4 text-xs text-slate-500">

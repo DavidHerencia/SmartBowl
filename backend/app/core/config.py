@@ -18,6 +18,7 @@ MQTT_KEEPALIVE: int = int(os.getenv("MQTT_KEEPALIVE", "60"))
 # a JSON payload containing hydration and sensor info. Default below can be
 # overridden via env.
 SUB_TOPIC: str = os.getenv("SUB_TOPIC", "home/water/consumption")
+LEVEL_TOPIC: str | None = os.getenv("LEVEL_TOPIC", "home/water/level")
 
 # Single outbound topic for actuator commands; payloads will be JSON like
 # { "command": "llenar" } or similar.

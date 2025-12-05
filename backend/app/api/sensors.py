@@ -19,6 +19,7 @@ def latest_readings() -> Dict[str, Any]:
         "subscribed_topic": SUB_TOPIC,
         "raw_last": copy.deepcopy(state.get("raw_last")),
         "hydration_last": copy.deepcopy(state.get("hydration_last")),
+        "level_last": copy.deepcopy(state.get("level_last")),
         "topics": topics,
         "last_event": copy.deepcopy(state.get("last_event")),
         "status": copy.deepcopy(state.get("status")),

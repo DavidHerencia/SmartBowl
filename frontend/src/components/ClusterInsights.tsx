@@ -71,7 +71,7 @@ export const ClusterInsights = ({ kmeans, today, todayEntry }: Props) => {
             </div>
           </div>
           <div className="text-xs text-blue-700">
-            Vector: {todayEntry.day} - {todayEntry.human_label ?? todayEntry.level}
+            {todayEntry.day} - {todayEntry.human_label ?? todayEntry.level}
           </div>
         </div>
       )}

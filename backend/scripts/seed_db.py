@@ -21,6 +21,23 @@ from app.core import db
 from app.core.config import SUB_TOPIC
 
 
+CLUSTERS = (
+    ("Adecuado", 600.0, 1000.0),
+    ("Medio", 300.0, 600.0),
+    ("Mínimo", 50.0, 300.0),
+)
+
+
+def _split_total_ml(total: float, parts: int) -> list[float]:
+    if parts <= 1:
+        return [total]
+    slices = [random.random() for _ in range(parts)]
+    s = sum(slices) or 1.0
+    normalized = [sl / s for sl in slices]
+    share = [total * n for n in normalized]
+    return share
+
+
 def _build_payload(vi: float, vf: float, dur: float) -> dict:
     return {
         "volumen_inicio": round(vi, 2),
@@ -29,15 +46,21 @@ def _build_payload(vi: float, vf: float, dur: float) -> dict:
     }
 
 
-def seed_hydration(days: int = 30, min_events: int = 2, max_events: int = 4) -> int:
+def _cluster_for_day(index: int) -> tuple[str, float, float]:
+    return CLUSTERS[index % len(CLUSTERS)]
+
+
+def seed_hydration(days: int = 10, min_events: int = 1, max_events: int = 4) -> int:
     """Populate hydration_events, hydration_log and readings for the last N days."""
     base_date = datetime.utcnow().date()
     total_events = 0
 
     for offset in range(days):
         target_day = base_date - timedelta(days=offset)
-        # choose how many drinking sessions for that day
+        cluster_name, min_ml, max_ml = _cluster_for_day(offset)
+        daily_total = random.uniform(min_ml, max_ml)
         sessions = random.randint(min_events, max_events)
+        portions = _split_total_ml(daily_total, sessions)
         # choose timestamps (sorted) within the day between 5:00 and 23:00
         hours = sorted(random.sample(range(5, 23), sessions))
         last_ts: int | None = None
@@ -48,9 +71,9 @@ def seed_hydration(days: int = 30, min_events: int = 2, max_events: int = 4) -> 
             gap_minutes = ((ts - last_ts) / 60.0) if last_ts else 0.0
             last_ts = ts
 
-            # generate volumes/durations
-            start_volume = random.uniform(600, 1100)
-            consumed = random.uniform(20, 160)
+            consumed = max(10.0, portions[idx] + random.uniform(-0.08 * portions[idx], 0.08 * portions[idx]))
+            start_volume = max(consumed + 20.0, consumed + random.uniform(40.0, 240.0))
+            start_volume = min(start_volume, 1300.0)
             end_volume = max(0.0, start_volume - consumed)
             duration = random.uniform(10, 180)
 
@@ -103,8 +126,8 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--days", type=int, default=30, help="Días de historial a generar")
-    parser.add_argument("--min-events", type=int, default=2, help="Eventos mínimos por día")
+    parser.add_argument("--days", type=int, default=10, help="Días de historial a generar")
+    parser.add_argument("--min-events", type=int, default=1, help="Eventos mínimos por día")
     parser.add_argument("--max-events", type=int, default=4, help="Eventos máximos por día")
     args = parser.parse_args()
     main(args)

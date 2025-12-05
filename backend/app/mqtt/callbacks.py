@@ -4,7 +4,7 @@ import time
 from typing import Any, Dict, Optional
 from datetime import datetime
 from ..core import db
-from ..core.config import SUB_TOPIC
+from ..core.config import SUB_TOPIC, LEVEL_TOPIC
 
 
 # In-memory cache for the most recent hydration message and derived status.
@@ -12,6 +12,7 @@ latest_readings: Dict[str, Any] = {
     "topics": {},
     "raw_last": None,
     "hydration_last": None,
+    "level_last": None,
     "last_event": None,
     "status": {},
     "last_command": None,
@@ -26,6 +27,9 @@ def on_connect(client, userdata, flags, rc):
     if SUB_TOPIC:
         client.subscribe(SUB_TOPIC)
         print("Subscribed to", SUB_TOPIC)
+    if LEVEL_TOPIC and LEVEL_TOPIC != SUB_TOPIC:
+        client.subscribe(LEVEL_TOPIC)
+        print("Subscribed to", LEVEL_TOPIC)
 def _store_raw(topic: str, payload: str, ts: int, parsed: Optional[Dict[str, Any]]) -> None:
     entry: Dict[str, Any] = {"topic": topic, "raw": payload, "ts": ts}
     if parsed is not None:
@@ -38,6 +42,41 @@ def _store_raw(topic: str, payload: str, ts: int, parsed: Optional[Dict[str, Any
         db.save_reading(topic, payload, ts)
     except Exception as e:
         print("DB save error:", e)
+
+
+def _handle_level_update(topic: str, payload: str, ts: int, data: Dict[str, Any]) -> None:
+    global _estimated_capacity_ml
+
+    try:
+        volumen = float(data["volumen"])
+    except Exception as exc:
+        print("Invalid level payload values", exc)
+        _store_raw(topic, payload, ts, data)
+        return
+
+    status = latest_readings.setdefault("status", {})
+    status["current_volume_ml"] = volumen
+    status["last_seen_ts"] = ts
+
+    if volumen > _estimated_capacity_ml:
+        _estimated_capacity_ml = volumen
+
+    capacity = status.get("estimated_capacity_ml") or _estimated_capacity_ml
+    if not capacity and volumen > 0:
+        capacity = volumen
+        status["estimated_capacity_ml"] = capacity
+
+    if capacity:
+        tank_percent = max(0.0, min(100.0, (volumen / capacity) * 100.0))
+        status["tank_level_percent"] = tank_percent
+
+    latest_readings["level_last"] = {
+        "ts": ts,
+        "topic": topic,
+        "volumen": volumen,
+    }
+
+    _store_raw(topic, payload, ts, data)
 
 
 def _handle_hydration_event(topic: str, payload: str, ts: int) -> None:
@@ -108,6 +147,7 @@ def _handle_hydration_event(topic: str, payload: str, ts: int) -> None:
     status["tank_level_percent"] = tank_percent
     status["last_drink_ts"] = ts
     status["last_drink_ml"] = ml_consumed
+    status["current_volume_ml"] = vf
 
     _store_raw(topic, payload, ts, data)
 
@@ -144,6 +184,8 @@ def on_message(client, userdata, msg):
 
     if isinstance(obj, dict) and all(k in obj for k in ("volumen_inicio", "volumen_fin", "duracion")):
         _handle_hydration_event(topic, payload, ts)
+    elif isinstance(obj, dict) and "volumen" in obj:
+        _handle_level_update(topic, payload, ts, obj)
     else:
         _store_raw(topic, payload, ts, obj if isinstance(obj, dict) else None)
 

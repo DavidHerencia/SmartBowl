@@ -78,8 +78,13 @@ const summarizeJson = (payload?: Record<string, unknown> | null) => {
   }
 };
 
+const readField = (obj: Record<string, unknown> | null | undefined, field: string) => {
+  if (!obj || typeof obj !== "object") return undefined;
+  return (obj as Record<string, unknown>)[field];
+};
+
 const App = () => {
-  const { data, loading, error, refresh } = useDashboardSummary({ days: 14, pollInterval: 8000 });
+  const { data, loading, error, refresh } = useDashboardSummary({ days: 7, pollInterval: 8000 });
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isSending, setIsSending] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -134,6 +139,7 @@ const App = () => {
   const lastCommand = data?.last_command ?? sensors?.last_command ?? null;
   const lastEvent = (data?.last_event ?? sensors?.last_event) as Record<string, unknown> | null;
   const rawLast = sensors?.raw_last ?? (data?.raw_last as Record<string, unknown> | null | undefined);
+  const levelLast = sensors?.level_last as Record<string, unknown> | null | undefined;
 
   const lastDrinkDescription = useMemo(() => {
     if (!lastDrink) return "Sin consumo reciente";
@@ -147,7 +153,7 @@ const App = () => {
       const cmd = (payload as Record<string, unknown>).command;
       return typeof cmd === "string" ? cmd : JSON.stringify(cmd);
     }
-    return "Sin comandos";
+    return "Sin acciones recientes";
   }, [lastCommand]);
 
   const sendCommand = async (payload: Record<string, unknown>, successText: string) => {
@@ -182,6 +188,14 @@ const App = () => {
   const eventMl = safeNumber(lastEvent?.ml_consumed ?? sensors?.hydration_last?.ml_consumed);
   const eventDuration = safeNumber(lastEvent?.duracion);
   const eventGap = safeNumber(lastEvent?.gap_min);
+  const statusVolume = safeNumber(status?.current_volume_ml);
+  const levelVolume = safeNumber(readField(levelLast ?? null, "volumen"));
+  const hydrationVolumeFromEvent = safeNumber(readField(lastEvent, "volumen_fin"));
+  const hydrationVolumeFromSensors = safeNumber(
+    readField((sensors?.hydration_last as Record<string, unknown> | null | undefined) ?? null, "volumen_fin")
+  );
+  const currentVolumeMl =
+    statusVolume ?? levelVolume ?? hydrationVolumeFromEvent ?? hydrationVolumeFromSensors ?? null;
 
   const topic = data?.device?.topic ?? sensors?.subscribed_topic ?? "home/water/consumption";
 
@@ -202,7 +216,6 @@ const App = () => {
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Smart IoT</p>
               <h1 className="text-2xl font-bold text-slate-800 leading-tight">SmartBowl Dashboard</h1>
-              <p className="text-sm text-slate-500">Flujo completo: MQTT → FastAPI → React</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -213,7 +226,7 @@ const App = () => {
               )}
             >
               <span className={clsx("w-2.5 h-2.5 rounded-full", isOnline ? "bg-emerald-500 animate-pulse" : "bg-rose-500")} />
-              {isOnline ? "ONLINE" : "OFFLINE"}
+              {isOnline ? "Activo" : "Sin actividad"}
             </div>
             <div className="hidden sm:flex text-xs text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
               Tópico: {topic}
@@ -258,6 +271,9 @@ const App = () => {
           >
             <div className="absolute top-5 right-6 text-4xl sm:text-5xl font-extrabold text-blue-500">
               {loadingState ? "--" : `${sanitizePercent(tankPercent).toFixed(0)}%`}
+            </div>
+            <div className="absolute top-16 right-6 text-sm font-semibold text-slate-500">
+              {currentVolumeMl != null ? formatMl(currentVolumeMl) : "Sin volumen"}
             </div>
             <div className="p-6 h-72 flex flex-col justify-between relative z-10">
               <div>
@@ -310,10 +326,10 @@ const App = () => {
                 </div>
                 <div>
                   <p className="text-sm font-semibold">
-                    {status?.is_drinking ? "Detectando consumo" : isSystemOn ? "Sistema listo" : "Sistema inactivo"}
+                    {status?.is_drinking ? "Se detectó un consumo" : isSystemOn ? "Sistema listo" : "Sistema inactivo"}
                   </p>
                   <p className="text-xs text-slate-500">
-                    {status?.is_drinking ? "Hidratación en curso" : "Esperando evento MQTT"}
+                    {status?.is_drinking ? "Hidratación en curso" : "Esperando evento"}
                   </p>
                 </div>
               </div>
@@ -323,7 +339,7 @@ const App = () => {
             {!isOnline && (
               <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 border border-amber-100 px-3 py-2 rounded-xl">
                 <AlertCircle className="w-4 h-4" />
-                Sin conexión reciente. Verifica MQTT.
+                Sin consumos detectados recientemente.
               </div>
             )}
 
@@ -352,13 +368,13 @@ const App = () => {
                 )}
               >
                 <Power className="w-5 h-5" />
-                {isSystemOn ? "Enviar comando: Apagar" : "Enviar comando: Encender"}
+                {isSystemOn ? "Apagar" : "Encender"}
               </button>
 
               <div className="flex flex-wrap gap-3 text-sm text-slate-500">
                 <div className="flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-xl">
                   <Smartphone className="w-4 h-4" />
-                  Último comando: {lastCommandLabel}
+                  Última acción: {lastCommandLabel}
                 </div>
                 <div className="flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-xl">
                   <Clock className="w-4 h-4" />
@@ -381,7 +397,7 @@ const App = () => {
             {
               label: "Consumo de hoy",
               value: formatMl(hydration?.today?.ml),
-              helper: todayEntry?.human_label ?? todayEntry?.level ?? "Sin etiqueta",
+              helper: todayEntry?.human_label ?? todayEntry?.level ?? "Sin registro",
               icon: <Activity className="w-5 h-5" />,
               accent: "bg-blue-50 text-blue-700"
             },
@@ -406,7 +422,7 @@ const App = () => {
 
         <HydrationHeatmap
           items={hydration?.week?.items ?? []}
-          summary={hydration?.summary ?? "Sin datos de hidratación."}
+          summary={hydration?.summary ?? "Sin    de hidratación."}
           loading={loadingState}
         />
 
@@ -438,8 +454,10 @@ const App = () => {
                 <p className="text-lg font-semibold text-slate-800">{eventGap ? `${eventGap.toFixed(1)} min` : "--"}</p>
               </div>
               <div className="rounded-xl bg-slate-50 p-3">
-                <p className="text-xs text-slate-400 uppercase">Tanque</p>
-                <p className="text-lg font-semibold text-slate-800">{formatMl(status?.last_drink_ml)}</p>
+                <p className="text-xs text-slate-400 uppercase">Volumen actual</p>
+                <p className="text-lg font-semibold text-slate-800">
+                  {currentVolumeMl != null ? formatMl(currentVolumeMl) : "--"}
+                </p>
               </div>
             </div>
 

@@ -143,11 +143,11 @@ def dashboard_summary(days: int = Query(7, ge=1, le=30)) -> Dict[str, Any]:
     last_event = state.get("last_event") or {}
 
     last_seen_ts = status.get("last_seen_ts") or raw_last.get("ts") or last_event.get("ts")
-    is_online = bool(last_seen_ts and (now_ts - int(last_seen_ts) <= 300))
+    is_online = bool(last_seen_ts and (now_ts - int(last_seen_ts) <= 600))
     is_system_on = is_online
 
     last_drink_ts = status.get("last_drink_ts") or hydration_last.get("ts") or last_event.get("ts")
-    is_drinking = bool(last_drink_ts and (now_ts - int(last_drink_ts) <= 60))
+    is_drinking = bool(last_drink_ts and (now_ts - int(last_drink_ts) <= 10))
 
     last_command_raw = state.get("last_command")
     last_command = dict(last_command_raw) if isinstance(last_command_raw, dict) and last_command_raw else None
@@ -159,7 +159,7 @@ def dashboard_summary(days: int = Query(7, ge=1, le=30)) -> Dict[str, Any]:
         payload = last_command.get("payload") if isinstance(last_command.get("payload"), dict) else None
         cmd = payload.get("command") if isinstance(payload, dict) else None
         cmd_ts = last_command.get("ts")
-        if cmd in {"llenar", "fill"} and cmd_ts and now_ts - int(cmd_ts) <= 60:
+        if cmd in {"llenar", "fill"} and cmd_ts and now_ts - int(cmd_ts) <= 6:
             is_filling = True
 
     tank_percent = status.get("tank_level_percent")
